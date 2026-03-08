@@ -1,12 +1,10 @@
 # interview-intel-open
 
-面经情报站开源版 — 爬虫 Skill + 后端 Server + MCP Server
+面经情报站开源版 — AI 驱动的面经采集 Skill + 后端 Server + MCP Server
 
-## 快速开始
+## 接入 AI 查询（推荐，零安装）
 
-### 接入 AI 查询（推荐）
-
-无需本地部署，直接用 npx 接入：
+在你的 AI 工具（Cursor / Kiro / Claude Desktop）的 MCP 配置中添加：
 
 ```json
 {
@@ -23,33 +21,36 @@
 }
 ```
 
-在 [tiaozi.site](https://tiaozi.site) 注册账号获取 Token，支持 Cursor / Kiro / Claude Desktop 等所有 MCP 工具。
+在 [tiaozi.site](https://tiaozi.site) 注册账号获取 Token，然后直接问 AI：
 
-### 贡献数据
+- 「字节跳动面试风格是什么？」
+- 「MySQL 哪些知识点考得最多？」
+- 「帮我制定 Redis 复习计划」
 
-```bash
-# 1. clone 并安装依赖
-git clone https://github.com/NoSuchClass/interview-intel-open
-cd interview-intel-open/skill/scripts && npm install
+## 贡献数据（AI 驱动，无需手动执行脚本）
 
-# 2. 一句话生成 profile
-node init-profile.js --quick "Java 社招"
+1. **Clone 到本地，用 Kiro 打开**
+   ```bash
+   git clone https://github.com/NoSuchClass/interview-intel-open
+   ```
 
-# 3. 绑定 Token（在 tiaozi.site 个人中心获取）
-node init-profile.js --set-token YOUR_TOKEN
+2. **直接跟 AI 对话**，AI 会自动完成所有操作：
+   > 「帮我爬取字节跳动和美团的面经，我是 Java 社招」
 
-# 4. 爬取并推送
-node text-crawl-parallel.js
-node push-remote.js
-```
+   AI 会自动：检查环境 → 生成 profile → 执行爬虫 → 提取结构化数据
+
+3. **推送到公共库**（在 tiaozi.site 获取 Token）：
+   > 「帮我推送数据，我的 token 是 xxx」
+
+详细的 AI 行为指南见 [skill/SKILL.md](skill/SKILL.md)。
 
 ## 目录结构
 
 ```
 interview-intel-open/
-├── skill/          ← 爬虫 Skill（本地采集 + 推送）
-│   ├── SKILL.md
-│   ├── scripts/    ← 爬虫脚本
+├── skill/          ← AI 驱动的爬虫 Skill
+│   ├── SKILL.md    ← AI 行为指南（意图识别 + 工作流）
+│   ├── scripts/    ← 爬虫脚本（由 AI 调用，无需手动执行）
 │   └── templates/  ← profile 模板
 ├── server/         ← 后端 Server（自部署用）
 ├── mcp/            ← MCP Server 源码
