@@ -203,8 +203,8 @@ function buildPushPayload(db, row) {
     title: row.title,
     sourceUrl: row.source_url,
     publishedAt: row.published_at,
-    position: row.position,
-    recruitType: row.recruit_type,
+    position: row.position || null,
+    recruitType: row.recruit_type || null,
     contentHash,
     questions: questionsWithFu,
   };
