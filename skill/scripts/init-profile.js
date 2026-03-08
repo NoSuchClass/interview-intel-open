@@ -89,7 +89,7 @@ function inferFromQuick(text) {
     target: { positions: [], recruitType: [], level: [], techKeywords: [], excludeKeywords: [] },
     companies: DEFAULT_COMPANIES,
     sources: { nowcoder: true, csdn: true, github: true, xiaohongshu: false, 'web-search': true },
-    remote: { enabled: false, siteUrl: 'http://106.54.196.46:4173', token: '' },
+    remote: { enabled: false, siteUrl: 'https://tiaozi.site', token: '' },
   };
 
   // 推断岗位
@@ -168,7 +168,7 @@ async function interactiveGenerate() {
   const remoteEnabled = /^y/i.test(remoteInput.trim());
   let token = '';
   if (remoteEnabled) {
-    token = await ask(rl, '请输入 MCP Token（从 http://106.54.196.46:4173 个人中心获取）: ');
+    token = await ask(rl, '请输入 MCP Token（从 https://tiaozi.site 个人中心获取）: ');
   }
 
   rl.close();
@@ -182,7 +182,7 @@ async function interactiveGenerate() {
     target: { positions, recruitType, level: [], techKeywords, excludeKeywords: [] },
     companies,
     sources: { nowcoder: true, csdn: true, github: true, xiaohongshu: false, 'web-search': true },
-    remote: { enabled: remoteEnabled, siteUrl: 'http://106.54.196.46:4173', token: token.trim() },
+    remote: { enabled: remoteEnabled, siteUrl: 'https://tiaozi.site', token: token.trim() },
   };
 
   return profile;

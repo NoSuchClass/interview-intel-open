@@ -31,6 +31,7 @@ const WORKER_MAP = {
   segmentfault: 'segmentfault-worker.js',
   github: 'github-worker.js',
   csdn: 'csdn-crawl-worker.js',
+  xiaohongshu: 'xhs-crawl-parallel.js', // XHS uses its own parallel dispatcher
 };
 
 function loadConfig() {
@@ -73,12 +74,12 @@ function launchWorker(sourceId, workerIdx, tasks) {
 
     console.log(`🚀 [${sourceId}] Worker ${workerIdx}: ${tasks.map(t => t.companyId).join(', ')}`);
 
-    const child = spawn('node', [
-      workerScript,
-      '--worker', String(workerIdx),
-      '--profile', profileDir,
-      '--tasks', JSON.stringify(tasks),
-    ], {
+    // XHS uses its own parallel dispatcher with different args
+    const spawnArgs = sourceId === 'xiaohongshu'
+      ? [workerScript, '--all', '--workers', '1', '--limit', String(tasks[0]?.limit || 5)]
+      : [workerScript, '--worker', String(workerIdx), '--profile', profileDir, '--tasks', JSON.stringify(tasks)];
+
+    const child = spawn('node', spawnArgs, {
       stdio: ['ignore', 'pipe', 'pipe'],
       env: { ...process.env },
     });

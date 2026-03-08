@@ -17,15 +17,30 @@ const db = require('./db');
 
 const INTEL_DIR = db.DB_DIR;
 const RAW_DIR = path.join(INTEL_DIR, 'raw');
+const PROFILE_PATH = path.join(INTEL_DIR, 'profile.json');
+
+function loadProfile() {
+  try { return JSON.parse(fs.readFileSync(PROFILE_PATH, 'utf-8')); }
+  catch { return null; }
+}
 
 // 从 DB 动态读取公司列表，不再依赖 _config.json
+// 降级：DB 为空时从 profile.json 读取
 function loadCompanies() {
   try {
-    return db.getDb().prepare('SELECT id, name, aliases FROM companies').all().map(c => ({
-      id: c.id,
-      name: c.name,
-      aliases: JSON.parse(c.aliases || '[]'),
-    }));
+    const rows = db.getDb().prepare('SELECT id, name, aliases FROM companies').all();
+    if (rows.length > 0) {
+      return rows.map(c => ({
+        id: c.id,
+        name: c.name,
+        aliases: JSON.parse(c.aliases || '[]'),
+      }));
+    }
+  } catch { /* fall through */ }
+  // 降级：从 profile 读
+  try {
+    const profile = loadProfile();
+    return (profile?.companies || []).map(c => ({ id: c.id, name: c.name, aliases: c.aliases || [] }));
   } catch { return []; }
 }
 
@@ -224,6 +239,9 @@ function cmdSave(companyId, fileName) {
     const raw = fs.existsSync(rawPath) ? parseRawMd(rawPath) : {};
 
     const interviewId = db.generateInterviewId(companyId);
+    const profile = loadProfile();
+    const position = profile?.target?.positions?.[0] || null;
+    const recruitType = profile?.target?.recruitType?.[0] || null;
 
     db.insertInterview({
       id: interviewId,
@@ -237,9 +255,11 @@ function cmdSave(companyId, fileName) {
       rounds: json.rounds || 1,
       questions: json.questions,
       jdHighlights: json.jdHighlights || [],
+      position,
+      recruitType,
     });
 
-    db.refreshHotTopics();
+    db.refreshTopicStats();
 
     const total = db.getInterviewCount(companyId);
     console.log(JSON.stringify({ ok: true, questions: json.questions.length, level: json.level || 'P6', total }));
@@ -274,6 +294,9 @@ function cmdSaveFromFile(companyId, fileName, jsonFile) {
   const raw = fs.existsSync(rawPath) ? parseRawMd(rawPath) : {};
 
   const interviewId = db.generateInterviewId(companyId);
+  const profile = loadProfile();
+  const position = profile?.target?.positions?.[0] || null;
+  const recruitType = profile?.target?.recruitType?.[0] || null;
 
   db.insertInterview({
     id: interviewId,
@@ -292,6 +315,8 @@ function cmdSaveFromFile(companyId, fileName, jsonFile) {
     jdHighlights: json.jdHighlights || [],
     rawFile: `raw/${companyId}/${fileName}`,
     title: raw.title || fileName,
+    position,
+    recruitType,
   });
 
   // Auto-log to extraction_log

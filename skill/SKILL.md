@@ -1,181 +1,341 @@
 ---
 name: interview-intel
-description: "面经情报采集 Skill — 通过对话驱动面经爬取、结构化提取和数据推送，无需手动执行脚本"
+description: "Interview Intelligence Skill — conversationally driven interview report crawling, structured extraction, and data contribution. No manual scripting required."
 ---
 
-# 面经情报 Skill
+# Interview Intelligence Skill
 
-> 你是面经情报采集助手。用户通过自然语言告诉你目标，你负责检查环境、执行脚本、汇报结果。
-> 所有脚本在 `skill/scripts/` 目录下，使用前先确认 `npm install` 已执行。
+> You are an interview intelligence assistant. The user tells you their goal in natural language; you check the environment, run scripts, and report results.
+> All scripts live under `skill/scripts/`. Always confirm `npm install` has been run before executing any script.
 
-## 意图识别
+## Intent Recognition
 
-当用户表达以下意图时，执行对应工作流：
-
-| 用户说 | 执行工作流 |
-|--------|-----------|
-| 「帮我爬/抓/采集面经」「开始爬取」 | → [爬取工作流] |
-| 「推送数据」「贡献数据」「上传面经」 | → [推送工作流] |
-| 「查看状态」「有多少数据」「爬了多少」 | → [状态查看] |
-| 「初始化」「设置 profile」「我是 Java 社招」 | → [Profile 初始化] |
-| 「设置 token」「绑定账号」 | → [Token 设置] |
-| 「提取题目」「结构化提取」 | → [提取工作流] |
-| 「帮我准备面试」「我要面字节」 | → [一键准备工作流] |
+| User says | Workflow |
+|-----------|----------|
+| "crawl / scrape / collect interview reports" | → [Crawl Workflow] |
+| "push data" / "contribute data" / "upload reports" | → [Push Workflow] |
+| "check status" / "how much data" / "what's been crawled" | → [Status Check] |
+| "initialize" / "set profile" / "I'm a Java experienced hire" | → [Profile Init] |
+| "set token" / "bind account" | → [Token Setup] |
+| "extract questions" / "structured extraction" / "process reports" | → [Extraction Workflow] |
+| "help me prep for interviews" / "I'm interviewing at ByteDance" | → [One-Click Prep] |
+| "first time" / "how to install" / "install browser" / "log in to Nowcoder" / "log in to Xiaohongshu" | → [Browser Environment Setup] |
 
 ---
 
-## 工作流
+## Workflows
 
-### [环境检查] — 所有工作流开始前执行
+### [Environment Check] — run before every workflow
 
 ```bash
-# 检查 node_modules 是否存在
+# Check node_modules
 ls skill/scripts/node_modules 2>/dev/null || (cd skill/scripts && npm install)
 
-# 检查 profile 是否存在
+# Check profile
 ls skill/scripts/data/profile.json 2>/dev/null
 ```
 
-如果 profile 不存在，先执行 [Profile 初始化]，再继续原工作流。
+If profile is missing, run [Profile Init] first, then resume the original workflow.
+If this is the first time, also run [Browser Environment Setup].
 
 ---
 
-### [Profile 初始化]
+### [Browser Environment Setup] — one-time setup
 
-**触发**：用户描述求职方向，或 profile 不存在时自动触发。
+**Why it's needed**: Platforms like Nowcoder require a logged-in session. Playwright uses a persistent browser profile to store cookies — log in once and all future crawls reuse the session automatically.
 
-**步骤**：
-1. 如果用户已说明方向（如「Java 社招」「Go 校招 5年」），直接执行：
+**Steps**:
+
+1. Install the Playwright browser (~160 MB, one-time only):
    ```bash
-   cd skill/scripts && node init-profile.js --quick "<用户描述>"
+   cd skill/scripts && npx playwright install chromium
    ```
 
-2. 如果用户没说明方向，询问：
-   - 岗位方向：Java后端 / Go后端 / 前端 / C++ / Python / 测试 / 大数据
-   - 招聘类型：社招 / 校招 / 实习
-   - 目标公司（可选，留空=全部）
+2. First-time login to Nowcoder (opens a real browser window):
+   ```bash
+   cd skill/scripts && node nowcoder-worker.js --worker 0 --tasks '[{"companyId":"bytedance","keywords":["ByteDance interview"],"limit":1}]'
+   ```
+   When the browser opens, log in manually (QR code or username/password). The script resumes automatically after login.
 
-3. 生成后读取 `skill/scripts/data/profile.json` 确认内容，展示给用户。
+3. Login state is saved at `~/.agent-browser-profile` (under your home directory).
+   - This is Playwright's persistent context directory — contains cookies, localStorage, etc.
+   - All future crawls reuse this profile. **No re-login needed.**
+   - Each platform uses its own profile directory:
+     - Nowcoder: `~/.agent-browser-profile`
+     - CSDN: `~/.agent-browser-profile-csdn`
+     - Juejin: `~/.agent-browser-profile-juejin`
+     - Xiaohongshu: `~/.agent-browser-profile-xhs-data/xiaohongshu`
 
-**示例对话**：
-> 用户：「我是 Java 社招，主要投字节和美团」
-> AI：执行 `node init-profile.js --quick "Java 社招"` → 展示生成的 profile → 询问是否需要调整公司范围
+4. Verify login: run the command again — if no login page appears and crawling starts directly, the session is valid.
+
+**Xiaohongshu (Little Red Book) login** — separate step required before first XHS crawl:
+
+```bash
+cd skill/scripts && node xhs-crawl-parallel.js --login
+```
+
+A browser window opens. Log in manually (QR code scan). Once done, press `Ctrl+C` to close. Login state is saved to `~/.agent-browser-profile-xhs-data/xiaohongshu`.
+
+For parallel crawling with multiple workers, copy the login state to worker profiles after logging in:
+
+```bash
+cd skill/scripts && node xhs-crawl-parallel.js --init-workers 3
+```
+
+**Notes**:
+- If cookies expire (typically after a few months), just re-run step 2 to log in again.
+- `headless: false` keeps the browser window visible, making it easy to handle CAPTCHAs or QR codes.
+- Do not delete `~/.agent-browser-profile` — doing so requires re-login.
 
 ---
 
-### [Token 设置]
+### [Profile Init]
 
-**触发**：用户说「设置 token」，或推送时发现没有 token。
+**Trigger**: user describes their job search direction, or profile is missing.
 
-**步骤**：
-1. 告知用户去 [tiaozi.site](https://tiaozi.site) 注册并在个人中心创建 MCP Token
-2. 用户粘贴 token 后执行：
+**Steps**:
+1. If the user has already stated their direction (e.g. "Java experienced hire", "Go campus recruit"), run directly:
+   ```bash
+   cd skill/scripts && node init-profile.js --quick "<user description>"
+   ```
+
+2. If no direction given, ask:
+   - Role: Java Backend / Go Backend / Frontend / C++ / Python / QA / Big Data
+   - Hire type: Experienced / Campus / Intern
+   - Target companies (optional — leave blank for all)
+
+3. After generation, read `skill/scripts/data/profile.json` and show the user a summary.
+
+**Example**:
+> User: "I'm a Java experienced hire, mainly targeting ByteDance and Meituan"
+> AI: runs `node init-profile.js --quick "Java experienced hire"` → shows profile → asks if company list needs adjustment
+
+---
+
+### [Token Setup]
+
+**Trigger**: user says "set token", or push fails due to missing token.
+
+**Steps**:
+1. Tell the user to register at [tiaozi.site](https://tiaozi.site) and create an MCP Token in their profile.
+2. After the user pastes the token:
    ```bash
    cd skill/scripts && node init-profile.js --set-token <token>
    ```
-3. 确认 profile.json 中 `push_token` 字段已更新
+3. Confirm the `token` field in `profile.json` is updated.
 
 ---
 
-### [爬取工作流]
+### [Crawl Workflow]
 
-**触发**：用户想采集面经。
+**Trigger**: user wants to collect interview reports.
 
-**步骤**：
-1. 执行 [环境检查]
-2. 询问或确认爬取范围（默认用 profile 中的公司列表）
-3. 执行爬取：
+**Steps**:
+1. Run [Environment Check].
+2. Confirm crawl scope (defaults to companies in profile).
+3. Start crawling:
    ```bash
-   cd skill/scripts && node text-crawl-parallel.js
+   cd skill/scripts && node text-crawl-parallel.js --all --limit 5
    ```
-4. 实时汇报进度（每家公司爬完后报告数量）
-5. 爬取完成后，询问是否立即提取结构化数据
+4. Report progress after each company finishes.
+5. After crawling, ask if the user wants to run structured extraction immediately.
 
-**动态调整**：
-- 如果用户说「只爬字节」，修改命令：`node text-crawl-parallel.js --company bytedance`
-- 如果用户说「快点」，提示可以减少公司范围
-- 如果报错，分析错误原因并给出修复建议
+**Dynamic adjustments**:
+- "Only crawl ByteDance" → `node text-crawl-parallel.js --companies bytedance --limit 5`
+- "Faster" → reduce company scope
+- On error → analyze and suggest a fix
+
+**Crawl priority** (based on local data volume):
+
+| Questions in DB | Limit per company | Notes |
+|-----------------|-------------------|-------|
+| < 50 | 15 | Critically low — prioritize |
+| 50–99 | 10 | Low |
+| 100–199 | 7 | Moderate |
+| ≥ 200 | 5 | Sufficient — maintenance crawl |
 
 ---
 
-### [提取工作流]
+### [Extraction Workflow]
 
-**触发**：爬取完成后，或用户主动要求提取。
+**Trigger**: after crawling, or user explicitly requests extraction.
 
-**步骤**：
-1. 执行：
+> This workflow is driven by the AI assistant in the current conversation (Kiro, Cursor, Claude, etc.) — no external API calls are made.
+> The script only reads files and writes to DB. The AI does the actual extraction inline.
+
+**Steps**:
+
+1. Check pending files:
    ```bash
-   cd skill/scripts && node extract-raw.js
+   node extract-raw.js --dry
    ```
-2. 汇报提取了多少题目、哪些公司、哪些模块
+
+2. Get the next batch of prompts:
+   ```bash
+   node extract-raw.js --list [companyId]
+   ```
+   Returns a JSON array. Each item has `systemPrompt`, `userPrompt` (report body, up to 4000 chars), `file`, `companyId`.
+
+3. For each item: the AI reads `systemPrompt` + `userPrompt` directly in this conversation and produces the structured JSON result.
+
+4. Write the result to DB:
+   ```bash
+   node extract-raw.js --save <companyId> <fileName> --file <result.json>
+   ```
+   On success: `{"ok":true,"questions":N,"level":"P6","total":M}`.
+   Progress is auto-recorded in `extraction_log` — no manual tracking needed.
+
+5. Repeat steps 2–4 until `--dry` shows 0 pending.
+
+6. Report final stats:
+   ```bash
+   node query.js --stats
+   ```
+
+#### Extraction Rules (built into systemPrompt)
+
+**Atomic splitting**: if one numbered item contains multiple independent knowledge points (multiple question marks, "and also", "as well as"), split into separate records.
+
+Exceptions — do NOT split:
+- Project deep-dives: consecutive follow-ups on the same project → 1 record, `type: project-deep-dive`
+- Algorithm questions: problem + optimization follow-ups → 1 record
+- System design: full design question + detail follow-ups → 1 record
+
+**Required fields per question**:
+
+| Field | Description |
+|-------|-------------|
+| `module` | Knowledge domain (see Module Reference below) |
+| `topic` | Normalized topic name |
+| `type` | `八股` / `场景设计` / `代码题` / `系统设计` / `追问链` / `project-deep-dive` |
+| `questionStyle` | One of 24 styles (see Style Reference below) |
+| `depthLevel` | `surface` / `mechanism` / `source` / `design` |
+| `difficulty` | `1`–`5` integer string (see Difficulty Reference below) |
+| `content` | Normalized question text |
+| `rawContent` | Interviewer's exact words |
+| `answerHint` | Key answer points (brief, for AI reference) |
+| `round` | Interview round number (integer, default 1) |
+| `followUps` | Array of `{content, parentIndex, depth}` objects |
+| `knowledgePoints` | kebab-case identifiers |
+
+**Interview-level metadata** (top-level fields alongside `questions`):
+
+- `rounds`: total rounds recorded in this report
+- `result`: `pass` / `fail` / `unknown`
+- `experienceYears`: string like `"3"`, `"3-5"`, `"5+"`, or `null`
+- `education`: `"本科"` / `"硕士"` / `"博士"` / `null`
+
+**Multi-company reports**: if one file contains interviews from multiple companies, extract each company separately and call `--save` once per company with the same filename but different `companyId`.
+
+**Non-interview content**: return `{"skip": true, "reason": "..."}` — the script auto-records this as skipped.
+
+**HR round questions**: extract them normally. Use `module: hr`, set `difficulty` based on topic complexity (1 for intro/salary/resignation, 2 for career planning, 3 for team collaboration cases).
+
+#### Module Reference (17 modules — no new modules allowed)
+
+| module | Domain |
+|--------|--------|
+| `mysql` | MySQL / databases |
+| `concurrent` | Concurrent programming |
+| `java-basic` | Java basics / collections / design patterns |
+| `redis` | Redis / caching |
+| `jvm` | JVM |
+| `spring` | Spring / frameworks |
+| `algorithm` | Algorithms / coding problems |
+| `network` | Networking / Netty |
+| `system-design` | System design / scenario questions |
+| `distributed` | Distributed systems |
+| `mq` | Message queues (general) |
+| `microservice` | Microservices |
+| `kafka` | Kafka (dedicated) |
+| `os` | Operating systems |
+| `hr` | HR / soft skills |
+| `project` | Project experience |
+| `other` | DevOps / security / Elasticsearch / misc |
+
+#### Difficulty Reference (integer strings only — no P5/P6/P7, no decimals)
+
+| Value | Meaning | Base rule |
+|-------|---------|-----------|
+| `"1"` | Introductory | HR topics: intro / salary / resignation |
+| `"2"` | Basic | `depthLevel: surface`; HR: career planning |
+| `"3"` | Intermediate | `depthLevel: mechanism`; coding problems |
+| `"4"` | Advanced | `depthLevel: source` or `design` |
+| `"5"` | Hard | Architecture-level design |
+
+Style adjustments: `source-code` / `system-design` / `project-deep-dive` / `optimization` / `trade-off` / `reliability` / `data-consistency` → +1; `concept` / `experience` / `workflow` → −1.
+
+#### Question Style Reference (24 values — no others allowed)
+
+`concept` `principle` `source-code` `comparison` `scenario` `troubleshoot` `coding` `system-design` `best-practice` `trade-off` `anti-pattern` `experience` `cross-domain` `evolution` `project-deep-dive` `implementation` `optimization` `boundary` `why-not` `workflow` `config-tuning` `monitoring` `reliability` `data-consistency`
 
 ---
 
-### [推送工作流]
+### [Push Workflow]
 
-**触发**：用户想贡献数据到公共站。
+**Trigger**: user wants to contribute data to the public site.
 
-**步骤**：
-1. 检查 token 是否已设置（读 profile.json 中的 `push_token`）
-   - 没有 → 执行 [Token 设置]
-2. 预览待推送数据：
+**Steps**:
+1. Check if token is set in `profile.json`.
+   - Missing → run [Token Setup] first.
+2. Preview pending data:
    ```bash
    cd skill/scripts && node push-remote.js --status
    ```
-3. 展示待推送数量，询问用户确认
-4. 执行推送：
+3. Show pending count, ask user to confirm.
+4. Push:
    ```bash
    cd skill/scripts && node push-remote.js
    ```
-5. 汇报推送结果（成功/失败/跳过数量）
+5. Report results (accepted / failed / skipped-duplicate counts).
 
-**注意**：推送限额 100 篇/天，超出时告知用户明天继续。
+**Note**: daily push limit is 100 reports. If exceeded, inform the user to continue tomorrow.
 
 ---
 
-### [状态查看]
+### [Status Check]
 
-**触发**：用户想了解当前数据情况。
+**Trigger**: user wants to know the current data situation.
 
-**步骤**：
-1. 检查本地数据库：
+**Steps**:
+1. Local DB stats:
    ```bash
    cd skill/scripts && node query.js --stats
    ```
-2. 检查待推送数量：
+2. Pending push count:
    ```bash
    cd skill/scripts && node push-remote.js --status
    ```
-3. 汇总展示：
-   - 本地面经总数、各公司分布
-   - 已提取题目数
-   - 待推送数量
-   - profile 当前配置
+3. Show a summary:
+   - Total local reports and per-company breakdown
+   - Total extracted questions
+   - Pending push count
+   - Current profile config
 
 ---
 
-### [一键准备工作流]
+### [One-Click Prep]
 
-**触发**：用户说「帮我准备面试」「我要面 XX 公司」。
+**Trigger**: user says "help me prep for interviews" or "I'm interviewing at [company]".
 
-**步骤**：
-1. 询问目标公司和岗位（如果没说）
-2. 自动执行完整流程：
-   - [Profile 初始化]（如果需要）
-   - [爬取工作流]（针对目标公司）
-   - [提取工作流]
-3. 完成后告知用户：
-   - 采集了多少面经
-   - 建议接入 MCP 查询（配置方式见下方）
-   - 如果想贡献数据，执行 [推送工作流]
+**Steps**:
+1. Ask for target company and role if not stated.
+2. Run the full pipeline automatically:
+   - [Profile Init] (if needed)
+   - [Crawl Workflow] (scoped to target company)
+   - [Extraction Workflow]
+3. Report completion:
+   - How many reports were collected
+   - Suggest connecting via MCP for querying (see MCP section below)
+   - Offer to run [Push Workflow] to contribute data
 
 ---
 
-## MCP 查询接入
+## MCP Query Integration
 
-爬取完成后，用户可以通过 MCP 直接在 AI 中查询本地数据。
+After crawling, connect via MCP to query your local data directly inside AI.
 
-在 Kiro 的 `.kiro/settings/mcp.json` 中添加：
+Add to `.kiro/settings/mcp.json`:
 
 ```json
 {
@@ -191,7 +351,7 @@ ls skill/scripts/data/profile.json 2>/dev/null
 }
 ```
 
-或者使用公共站（无需本地数据）：
+Or use the public site (no local data needed):
 
 ```json
 {
@@ -201,7 +361,7 @@ ls skill/scripts/data/profile.json 2>/dev/null
       "args": ["-y", "interview-intel-mcp@latest"],
       "env": {
         "INTERVIEW_INTEL_API_URL": "https://tiaozi.site",
-        "INTERVIEW_INTEL_TOKEN": "你的Token"
+        "INTERVIEW_INTEL_TOKEN": "your-token-here"
       }
     }
   }
@@ -210,38 +370,41 @@ ls skill/scripts/data/profile.json 2>/dev/null
 
 ---
 
-## 脚本说明
+## Script Reference
 
-| 脚本 | 用途 | 关键参数 |
-|------|------|---------|
-| `init-profile.js` | 生成/更新 profile | `--quick "描述"` `--set-token <token>` |
-| `text-crawl-parallel.js` | 并行爬取面经 | `--company <id>` |
-| `extract-raw.js` | AI 结构化提取题目 | — |
-| `push-remote.js` | 推送到公共站 | `--status` `--dry-run` `--company <id>` |
-| `query.js` | 本地查询 CLI | `--stats` `--company <id>` |
-
----
-
-## 错误处理
-
-| 错误 | 处理方式 |
-|------|---------|
-| `npm install` 失败 | 检查 Node.js 版本（需要 18+），提示用户安装 |
-| 爬取返回 0 条 | 检查网络，提示可能需要配置代理 |
-| 推送 401 | Token 无效或过期，引导用户重新设置 |
-| 推送 429 | 超出每日限额，告知明天继续 |
-| DB 文件不存在 | 提示先执行爬取 |
+| Script | Purpose | Key flags |
+|--------|---------|-----------|
+| `init-profile.js` | Create / update profile | `--quick "description"` `--set-token <token>` `--show` |
+| `text-crawl-parallel.js` | Parallel crawl across platforms | `--all` `--companies <id,...>` `--sources <id,...>` `--limit N` |
+| `xhs-crawl-parallel.js` | Xiaohongshu parallel crawl | `--login` `--init-workers N` `--all` `--companies <id,...>` `--workers N` `--limit N` |
+| `extract-raw.js` | AI-driven structured extraction | `--dry` `--list [company]` `--save <co> <file> --file <json>` |
+| `push-remote.js` | Push to public site | `--status` `--dry-run` `--company <id>` |
+| `query.js` | Local query CLI | `--stats` `--query` `--hot-topics` |
 
 ---
 
-## 数据目录（运行时生成）
+## Error Handling
+
+| Error | Resolution |
+|-------|-----------|
+| `npm install` fails | Check Node.js version (requires 18+) |
+| `Executable doesn't exist` | Playwright browser not installed — run `npx playwright install chromium` |
+| Login page appears during crawl | Cookies expired — log in manually in the browser window; session saved to `~/.agent-browser-profile` |
+| Crawl returns 0 results | Check network / proxy; verify company names and keywords in profile |
+| Push 401 | Token invalid or expired — re-run [Token Setup] |
+| Push 429 | Daily limit reached — continue tomorrow |
+| DB file missing | Run crawl + extraction first |
+
+---
+
+## Data Directory (generated at runtime)
 
 ```
 skill/scripts/data/
-├── profile.json          # 用户配置（岗位/公司/token）
-├── interview-intel.db    # 本地 SQLite 数据库
+├── profile.json           # User config (role / companies / token)
+├── interview-intel.db     # Local SQLite database
 └── raw/
-    └── <company>/        # 原始面经 markdown
+    └── <company>/         # Raw interview report markdown files
         ├── _manifest.json
         └── *.md
 ```

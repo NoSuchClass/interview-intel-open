@@ -12,7 +12,7 @@
  * 环境变量：
  *   GITHUB_TOKEN  推荐设置，Search API 必须认证，Contents API 限额从 60→5000/h
  */
-const { shouldSkipByTitle, shouldSkipByContent, matchesCompany, saveRawMd, loadManifest, urlExists, isUrlGloballyCrawled, loadConfig, sleep } = require('./crawl-common');
+const { shouldSkipByTitle, shouldSkipByContent, matchesCompany, saveRawMd, loadManifest, urlExists, isUrlGloballyCrawled, loadProfile, sleep } = require('./crawl-common');
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 
@@ -151,8 +151,8 @@ async function processFile(file, companyId, manifest, processedUrls) {
 
 async function crawlOneCompany(task) {
   const { companyId, keywords, limit } = task;
-  const config = loadConfig();
-  const company = config.targetCompanies.find(c => c.id === companyId);
+  const profile = loadProfile();
+  const company = (profile?.companies || []).find(c => c.id === companyId);
   if (!company) { console.log(`  ❌ 未找到: ${companyId}`); return { companyId, saved: 0 }; }
 
   let saved = 0;
@@ -161,6 +161,12 @@ async function crawlOneCompany(task) {
 
   // 搜索词：公司名 + 别名
   const terms = [company.name, ...(company.aliases || []).slice(0, 2)];
+
+  // 从 profile 动态生成招聘类型关键词
+  const recruitTypes = profile?.target?.recruitType || ['social'];
+  const recruitKw = recruitTypes.includes('campus') ? '校招'
+    : recruitTypes.includes('intern') ? '实习'
+    : '社招';
 
   for (const term of terms) {
     if (saved >= limit) break;
@@ -182,10 +188,10 @@ async function crawlOneCompany(task) {
 
     if (saved >= limit) break;
 
-    // Search API: "拼多多 社招 后端"
-    console.log(`\n🔍 GitHub搜索: ${term} 社招 后端`);
+    // Search API: "拼多多 校招/社招 后端"
+    console.log(`\n🔍 GitHub搜索: ${term} ${recruitKw} 后端`);
     await sleep(2500);
-    const results2 = await searchCode(`${term} 社招 后端`, 20);
+    const results2 = await searchCode(`${term} ${recruitKw} 后端`, 20);
     console.log(`  📋 ${results2.length} 个结果`);
 
     for (const file of results2) {
