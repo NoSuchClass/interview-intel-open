@@ -7,9 +7,10 @@
  *   --tasks <JSON>     [{companyId, keywords, limit}]
  */
 const { chromium } = require('playwright');
+const os = require('os');
 const { shouldSkipByTitle, shouldSkipByContent, matchesCompany, saveRawMd, urlExists, loadManifest, isUrlGloballyCrawled, sleep } = require('./crawl-common');
 
-const PROFILE_DIR_DEFAULT = '/Users/liuyuehe/.agent-browser-profile';
+const PROFILE_DIR_DEFAULT = require('path').join(os.homedir(), '.agent-browser-profile');
 
 /**
  * 在搜索结果页收集所有帖子链接（标题+href），通过点击"下一页"翻页

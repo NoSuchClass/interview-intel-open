@@ -275,12 +275,41 @@ async function main() {
   let limit = 5;
   let allCompanies = false;
   let dryRun = false;
+  let tasksFromDispatcher = null; // --tasks JSON from text-crawl-parallel.js
 
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--company' || args[i] === '--companies') companyFilter = args[++i].split(',');
     else if (args[i] === '--all') allCompanies = true;
     else if (args[i] === '--limit') limit = parseInt(args[++i]);
     else if (args[i] === '--dry') dryRun = true;
+    else if (args[i] === '--tasks') tasksFromDispatcher = JSON.parse(args[++i]);
+    else if (args[i] === '--worker') i++; // ignore worker index
+    else if (args[i] === '--profile') i++; // CSDN doesn't need browser profile
+  }
+
+  // --tasks mode: dispatched by text-crawl-parallel.js
+  if (tasksFromDispatcher) {
+    const { loadProfile } = require('./crawl-common.js');
+    const profile = loadProfile();
+    const companyMap = Object.fromEntries((profile?.companies || []).map(c => [c.id, c]));
+
+    console.log(`\n${'='.repeat(50)}`);
+    console.log(`📰 CSDN Worker (dispatched) — ${tasksFromDispatcher.length} 个公司`);
+    console.log(`${'='.repeat(50)}`);
+
+    const results = [];
+    for (const task of tasksFromDispatcher) {
+      const companyConfig = companyMap[task.companyId] || { id: task.companyId, name: task.companyId, searchKeywords: task.keywords };
+      // merge dispatcher keywords into companyConfig
+      if (task.keywords) companyConfig.searchKeywords = [...new Set([...(companyConfig.searchKeywords || []), ...task.keywords])];
+      const r = await crawlForCompany(task.companyId, companyConfig, task.limit || limit, dryRun);
+      results.push(r);
+      await sleep(2000 + Math.random() * 1000);
+    }
+
+    const totalSaved = results.reduce((s, x) => s + x.saved, 0);
+    console.log(`\n📊 CSDN 完成，总计保存: ${totalSaved} 篇`);
+    return;
   }
 
   if (!allCompanies && !companyFilter) {

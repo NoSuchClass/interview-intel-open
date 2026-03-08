@@ -21,6 +21,7 @@
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const SCRIPTS_DIR = __dirname;
 
@@ -65,9 +66,10 @@ function launchWorker(sourceId, workerIdx, tasks) {
     }
 
     // nowcoder 需要登录态，使用原始 profile；其他平台用独立 profile
+    const baseProfile = path.join(os.homedir(), '.agent-browser-profile');
     const profileDir = sourceId === 'nowcoder'
-      ? '/Users/liuyuehe/.agent-browser-profile'
-      : `/Users/liuyuehe/.agent-browser-profile-${sourceId}`;
+      ? baseProfile
+      : `${baseProfile}-${sourceId}`;
 
     console.log(`🚀 [${sourceId}] Worker ${workerIdx}: ${tasks.map(t => t.companyId).join(', ')}`);
 
@@ -174,7 +176,7 @@ async function main() {
     const tasks = companies.map(c => ({
       companyId: c.id,
       keywords: [
-        ...c.searchKeywords,
+        ...(c.searchKeywords || []),
         `${c.name} 后端 面经`,
         `${c.name} Java 面试`,
       ].filter((v, idx, arr) => arr.indexOf(v) === idx), // 去重
