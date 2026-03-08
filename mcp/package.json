@@ -1,0 +1,25 @@
+{
+  "name": "interview-intel-mcp",
+  "version": "2.0.1",
+  "description": "面经情报 MCP Server — 让 AI 知道哪些要考、哪些高频、追问链怎么走",
+  "type": "module",
+  "bin": {
+    "interview-intel-mcp": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "files": ["index.js", "README.md"],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.22.0"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": ["mcp", "interview", "java", "backend", "ai"],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}

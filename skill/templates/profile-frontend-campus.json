@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "name": "前端 校招",
+  "target": {
+    "positions": ["frontend"],
+    "recruitType": ["campus"],
+    "level": [],
+    "techKeywords": ["前端", "frontend", "react", "vue", "angular", "javascript", "typescript", "css", "html", "webpack", "vite", "node", "浏览器", "dom", "http", "性能优化", "小程序"],
+    "excludeKeywords": []
+  },
+  "companies": [
+    { "id": "bytedance", "name": "字节", "aliases": ["字节跳动", "抖音", "TikTok", "飞书"] },
+    { "id": "alibaba", "name": "阿里", "aliases": ["阿里巴巴", "淘天", "蚂蚁"] },
+    { "id": "tencent", "name": "腾讯", "aliases": ["微信", "腾讯云"] },
+    { "id": "meituan", "name": "美团", "aliases": ["大众点评"] },
+    { "id": "pdd", "name": "拼多多", "aliases": ["PDD", "Temu"] },
+    { "id": "baidu", "name": "百度", "aliases": [] },
+    { "id": "jd", "name": "京东", "aliases": [] },
+    { "id": "xiaomi", "name": "小米", "aliases": [] },
+    { "id": "netease", "name": "网易", "aliases": ["网易互娱"] },
+    { "id": "bilibili", "name": "B站", "aliases": ["哔哩哔哩"] },
+    { "id": "kuaishou", "name": "快手", "aliases": [] },
+    { "id": "xiaohongshu", "name": "小红书", "aliases": [] },
+    { "id": "dewu", "name": "得物", "aliases": [] },
+    { "id": "didi", "name": "滴滴", "aliases": [] },
+    { "id": "shopee", "name": "Shopee", "aliases": ["虾皮"] },
+    { "id": "ctrip", "name": "携程", "aliases": ["去哪儿"] }
+  ],
+  "sources": {
+    "nowcoder": true,
+    "csdn": true,
+    "github": true,
+    "xiaohongshu": false,
+    "web-search": true
+  },
+  "remote": {
+    "enabled": false,
+    "siteUrl": "http://106.54.196.46:4173",
+    "token": ""
+  }
+}
