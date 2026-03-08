@@ -170,18 +170,53 @@ async function main() {
   console.log(`   每公司每平台限制: ${limit} 条`);
 
   // 为每个平台生成任务列表
+  const profilePath = path.resolve(SCRIPTS_DIR, '../../data/profile.json');
+  let profile = null;
+  try { profile = JSON.parse(fs.readFileSync(profilePath, 'utf-8')); } catch {}
+  const recruitTypes = profile?.target?.recruitType || ['social'];
+  const positions = profile?.target?.positions || ['java-backend'];
+
+  // 根据 recruitType 生成招聘类型关键词
+  const recruitKws = [];
+  if (recruitTypes.includes('campus')) recruitKws.push('校招', '秋招', '春招');
+  if (recruitTypes.includes('social')) recruitKws.push('社招');
+  if (recruitTypes.includes('intern')) recruitKws.push('实习');
+
+  // 根据 positions 生成技术关键词
+  const techKws = [];
+  if (positions.includes('java-backend')) techKws.push('Java', '后端');
+  if (positions.includes('go-backend')) techKws.push('Go', 'Golang', '后端');
+  if (positions.includes('frontend')) techKws.push('前端');
+  if (positions.includes('cpp')) techKws.push('C++', '后端');
+  if (positions.includes('python')) techKws.push('Python', '后端');
+  if (positions.includes('ai-agent')) techKws.push('算法', 'AI');
+  if (positions.includes('test')) techKws.push('测试', '测开');
+  if (positions.includes('data')) techKws.push('大数据');
+  if (techKws.length === 0) techKws.push('后端');
+
   const promises = [];
   for (let i = 0; i < activeSources.length; i++) {
     const sourceId = activeSources[i];
-    const tasks = companies.map(c => ({
-      companyId: c.id,
-      keywords: [
-        ...(c.searchKeywords || []),
-        `${c.name} 后端 面经`,
-        `${c.name} Java 面试`,
-      ].filter((v, idx, arr) => arr.indexOf(v) === idx), // 去重
-      limit,
-    }));
+    const tasks = companies.map(c => {
+      // 基础关键词：公司名 × 技术方向 × 招聘类型 组合
+      const baseKws = [];
+      for (const tech of techKws.slice(0, 2)) {
+        for (const rt of recruitKws.length ? recruitKws : ['']) {
+          baseKws.push(rt ? `${c.name} ${tech} ${rt} 面经` : `${c.name} ${tech} 面经`);
+        }
+      }
+      // 通用面经词（兜底）
+      baseKws.push(`${c.name} 面经`);
+
+      return {
+        companyId: c.id,
+        keywords: [
+          ...(c.searchKeywords || []),
+          ...baseKws,
+        ].filter((v, idx, arr) => arr.indexOf(v) === idx), // 去重
+        limit,
+      };
+    });
 
     // 平台间错开 5-15 秒启动
     if (i > 0) {

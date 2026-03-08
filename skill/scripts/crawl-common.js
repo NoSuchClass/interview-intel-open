@@ -81,14 +81,17 @@ const SOCIAL_SIGNAL_RE = /社招/;
 function shouldSkipByTitle(title) {
   const t = title;
   const profile = loadProfile();
-  const { skipIntern, skipCampus } = buildRecruitFilter(profile);
+  const { skipIntern, skipCampus, skipSocial } = buildRecruitFilter(profile);
 
   if (SKIP_COLLECTION.test(t)) return { skip: true, reason: '题库/合集' };
   if (SKIP_AD.test(t)) return { skip: true, reason: '广告/引流' };
 
   if (skipIntern && SKIP_INTERN_RE.test(t)) return { skip: true, reason: '非目标类型(实习)' };
+  // 校招信号：有校招词且无社招词 → 过滤
   if (skipCampus && SKIP_CAMPUS_RE.test(t) && !SOCIAL_SIGNAL_RE.test(t)) return { skip: true, reason: '非目标类型(校招)' };
   if (skipCampus && SKIP_届_RE.test(t)) return { skip: true, reason: '非目标类型(届)' };
+  // 社招信号：有明确社招词 → 过滤
+  if (skipSocial && SOCIAL_SIGNAL_RE.test(t) && !SKIP_CAMPUS_RE.test(t)) return { skip: true, reason: '非目标类型(社招)' };
 
   return { skip: false, reason: '' };
 }
@@ -126,6 +129,10 @@ function shouldSkipByContent(title, contentPreview) {
   if (skipCampus) {
     const CAMPUS_CONTENT = /校招[面笔]|秋招[面笔]|春招[面笔]|提前批[面笔]|应届[面生]|[2][2-9]届.{0,4}(面|求职|秋招|春招|找工作)/i;
     if (CAMPUS_CONTENT.test(contentPreview)) return { skip: true, reason: '正文含校招信号' };
+  }
+  if (skipSocial) {
+    const SOCIAL_CONTENT = /社招[面笔]|社会招聘|社招offer|[3-9]年.*社招|社招.*[3-9]年/i;
+    if (SOCIAL_CONTENT.test(contentPreview)) return { skip: true, reason: '正文含社招信号' };
   }
 
   // ── 4. 题库/合集 ──
